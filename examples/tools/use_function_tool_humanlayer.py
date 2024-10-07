@@ -12,7 +12,7 @@ from dynamiq.nodes.tools.function_tool import FunctionTool, function_tool
 from dynamiq.runnables import RunnableConfig
 from dynamiq.utils import JsonWorkflowEncoder
 from examples.llm_setup import setup_llm
-
+from dynamiq.nodes.tools.humanlayer import require_approval
 hl = HumanLayer()
 
 AGENT_ROLE = "Professional mathematician"
@@ -34,14 +34,8 @@ def run_simple_workflow(test_type=1) -> tuple[str, dict]:
     llm = setup_llm()
 
     e2b_tool = E2BInterpreterTool(connection=E2BConnection())
-
-    @function_tool
-    @hl.require_approval()
-    def python_tool(code: str):
-        f"""{e2b_tool.description}"""
-        return e2b_tool.execute({'python': code})
-
-    tool_python = python_tool()
+    updated = require_approval()(e2b_tool.execute)
+    object.__setattr__(e2b_tool, "execute", updated)
 
     class AddNumbersTool(FunctionTool[int]):
         name: str = "Add Numbers Tool"
@@ -65,7 +59,7 @@ def run_simple_workflow(test_type=1) -> tuple[str, dict]:
         tools = [add_tool, multiply_tool]
         input_question = INPUT_QUESTION
     elif test_type == 1:
-        tools = [tool_python]
+        tools = [e2b_tool]
         input_question = INPUT_QUESTION1
 
     agent = ReActAgent(
