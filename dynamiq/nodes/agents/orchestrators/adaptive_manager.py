@@ -13,6 +13,11 @@ Your role is to:
 Available specialized agents:
 {agents}
 
+You have to follow structure to call agents in right order:
+* As first run concierge agent
+* After concierge event you can call any of this agents [transfer_money_agent, account_balance_agent, auth_agent, stock_lookup_agent].
+* When any of [transfer_money_agent, account_balance_agent, auth_agent, stock_lookup_agent] was successfully executed call concierge again to undestand whether to end or continue.
+
 Respond with a JSON object representing your next action. Use one of the following formats:
 
 For delegation:
