@@ -17,6 +17,7 @@ from dynamiq.nodes.tools.function_tool import function_tool
 from dynamiq.nodes.tools.human_feedback import HumanFeedbackTool
 from dynamiq.nodes.agents.base import Agent
 
+
 class CustomToolAgent(Agent):
     def execute(
         self, input_data, config: RunnableConfig | None = None, **kwargs
@@ -45,7 +46,7 @@ class CustomToolAgent(Agent):
             )
 
         logger.debug(f"Agent {self.name} - {self.id}: finished with result {tool_result}")
-        return execution_result 
+        return execution_result
 
 
 # Load environment variables
@@ -74,7 +75,7 @@ def create_workflow() -> Workflow:
         """Useful for searching for a stock symbol given a free-form company name."""
         logger.info("Searching for stock symbol")
         return str.upper()
-    
+
     @function_tool
     def done() -> None:
         """When you have returned a stock price, call this tool."""
@@ -96,20 +97,18 @@ def create_workflow() -> Workflow:
         """Adds the username to the user state."""
         print("Recording username")
         return "Username was recorded."
-    
+
     @function_tool
     def login(password: str) -> None:
         """Given a password, logs in and stores a session token in the user state."""
         logger.info(f"Logging in with password {password}")
-        return f'Sucessfully logged in with password {password}'
-    
+        return f"Sucessfully logged in with password {password}"
 
     @function_tool
     def is_authenticated() -> bool:
         """Checks if the user has a session token."""
         print("Checking if authenticated")
         return "User is authenticated"
-
 
     @function_tool
     def done() -> None:
@@ -128,7 +127,6 @@ def create_workflow() -> Workflow:
         tools=[store_username(), login(), is_authenticated(), done()],
     )
 
-
     # Account Balance Agent
     @function_tool
     def get_account_id(account_name: str) -> str:
@@ -142,7 +140,7 @@ def create_workflow() -> Workflow:
         """Useful for looking up an account balance."""
         logger.info(f"Looking up account balance for {account_id}")
         return f"Account {account_id} has a balance of $1000"
-    
+
     @function_tool
     def is_authenticated() -> bool:
         """Checks if the user has a session token."""
@@ -154,12 +152,10 @@ def create_workflow() -> Workflow:
         """When you complete your task, call this tool."""
         logger.info("Account balance lookup is complete")
         return "Account balance lookup is complete"
-    
-
 
     account_balance_agent = ReActAgent(
         name="account_balance_agent",
-        role=f"""
+        role="""
         You are a helpful assistant that is looking up account balances.
         The user may not know the account ID of the account they're interested in,
         so you can help them look it up by the name of the account.
@@ -167,14 +163,13 @@ def create_workflow() -> Workflow:
         If they aren't authenticated, tell them to authenticate
         If they're trying to transfer money, they have to check their account balance first, which you can help with.
         Once you have supplied an account balance, you must call the tool "done" to signal that you are done.
-        If the user asks to do anything other than look up an account balance, call the tool "done" to signal some other agent should help.
+        If the user asks to do anything other than look up an account balance,
+        call the tool "done" to signal some other agent should help.
          """,
         goal="Provide actions according to role",  # noqa: E501
         llm=llm,
         tools=[get_account_id(), get_account_balance(), is_authenticated(), done()],
     )
-
-
 
     # Transfer Money Agent
     @function_tool
@@ -182,35 +177,34 @@ def create_workflow() -> Workflow:
         """Useful for transferring money between accounts."""
         logger.info(f"Transferring {amount} from {from_account_id} account {to_account_id}")
         return f"Transferred {amount} to account {to_account_id}"
-    
+
     @function_tool
     def balance_sufficient(account_id: str, amount: int) -> bool:
         """Useful for checking if an account has enough money to transfer."""
         logger.info("Checking if balance is sufficient")
         return "There is enough money."
 
-    @function_tool        
+    @function_tool
     def has_balance() -> bool:
         """Useful for checking if an account has a balance."""
         logger.info("Checking if account has a balance")
         return "Account has enough balance"
-    
-    @function_tool        
+
+    @function_tool
     def is_authenticated() -> bool:
         """Checks if the user has a session token."""
         logger.info("Transfer money agent is checking if authenticated")
         return "User has a session token."
-    
-    @function_tool        
+
+    @function_tool
     def done() -> None:
         """When you complete your task, call this tool."""
         logger.info("Money transfer is complete")
         return "Money transfer is complete"
 
-    
     transfer_money_agent = ReActAgent(
         name="transfer_money_agent",
-        role=f"""
+        role="""
         You are a helpful assistant that transfers money between accounts.
         The user can only do this if they are authenticated, which you can check with the is_authenticated tool.
         If they aren't authenticated, tell them to authenticate first.
@@ -227,20 +221,20 @@ def create_workflow() -> Workflow:
     # Transfer Money Agent
     human_feedback_tool = HumanFeedbackTool()
     concierge_agent = CustomToolAgent(
-        name = "concierge_agent",
-        role=f"""
+        name="concierge_agent",
+        role="""
             You are a helpful assistant that is helping a user navigate a financial system.
             Your job is to ask the user questions to and return this in Answer. (make only one loop)
 
             Introduce user with the available things they can do.
             That includes
-            * looking up a stock price            
+            * looking up a stock price
             * authenticating the user
             * checking an account balance (requires authentication first)
             * transferring money between accounts (requires authentication and checking an account balance first)
 
             Make up some answer.
-            
+
          """,
         goal="Provide actions according to role",  # noqa: E501
         tools=[human_feedback_tool],
@@ -265,8 +259,8 @@ def run_planner() -> tuple[str, dict]:
     # Create workflow
     workflow = create_workflow()
 
-    user_prompt = f"""
-    Hello I need to check some c
+    user_prompt = """
+    Hello
     """  # noqa: E501
 
     # Run workflow
