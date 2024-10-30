@@ -1,6 +1,4 @@
-import io
 import json
-from pathlib import Path
 
 from dynamiq import Workflow
 from dynamiq.callbacks import TracingCallbackHandler
@@ -12,41 +10,18 @@ from dynamiq.runnables import RunnableConfig
 from dynamiq.utils import JsonWorkflowEncoder
 from examples.llm_setup import setup_llm
 
-INPUT_PROMPT = "Calculate the mean values for all columns in the CSV"
-FILE_PATH = ".data/sample_regression_data.csv"
-
-
-def read_file_as_bytesio(file_path: str, filename: str = None, description: str = None) -> io.BytesIO:
-    """
-    Reads the content of a file and returns it as a BytesIO object with custom attributes for filename and description.
-
-    Args:
-        file_path (str): The path to the file.
-        filename (str, optional): Custom filename for the BytesIO object.
-        description (str, optional): Custom description for the BytesIO object.
-
-    Returns:
-        io.BytesIO: The file content in a BytesIO object with custom attributes.
-
-    Raises:
-        FileNotFoundError: If the file does not exist.
-        IOError: If an I/O error occurs while reading the file.
-    """
-    file_path_obj = Path(file_path).resolve()
-    if not file_path_obj.exists():
-        raise FileNotFoundError(f"The file {file_path} does not exist.")
-    if not file_path_obj.is_file():
-        raise OSError(f"The path {file_path} is not a valid file.")
-
-    with file_path_obj.open("rb") as file:
-        file_content = file.read()
-
-    file_io = io.BytesIO(file_content)
-
-    file_io.name = filename if filename else file_path_obj.name
-    if description:
-        file_io.description = description
-    return file_io
+INPUT_PROMPT = "Summarize the text and try to evaluate it"
+FILE_PATH = ".data/sample-essay-1.pdf"
+AGENT_ROLE = (
+    "A helpful and general-purpose AI assistant with strong language, Python, "
+    "and Linux command-line skills. The goal is to provide concise answers to the user. "
+    "Additionally, try to generate code to solve tasks, then run it accurately. "
+    "Before answering, create a plan for solving the task. You can search for any API, "
+    "and use any free, open-source API that doesn't require authorization."
+    "You can install any packages for loading PDFS, such as PyMuPDF, PyPDF2, or pdfplumber."
+    "and for the other file extensions as well, if you need to open them try to search and then install."
+    "Also if you are working with binary files, try to understand the file format and then read the file."
+)
 
 
 def run_workflow(
@@ -83,24 +58,24 @@ def run_workflow(
         return "", {}
 
 
-csv_bytes_io = read_file_as_bytesio(
-    FILE_PATH, filename="custom_regression_data.csv", description="Custom CSV file with regression data"
-)
+csv_bytes = open(FILE_PATH, "rb").read()
 
 python_tool = E2BInterpreterTool(connection=E2B())
 
 llm = setup_llm()
 
+
 agent = ReActAgent(
     name="Agent",
     id="Agent",
     llm=llm,
+    role=AGENT_ROLE,
     tools=[python_tool],
 )
 
 output, traces = run_workflow(
     agent=agent,
     input_prompt=INPUT_PROMPT,
-    input_files=[csv_bytes_io],
+    input_files=[csv_bytes],
 )
 print("Agent Output:", output)
