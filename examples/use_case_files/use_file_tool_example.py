@@ -11,7 +11,8 @@ from dynamiq.utils import JsonWorkflowEncoder
 from examples.llm_setup import setup_llm
 
 INPUT_PROMPT = "Summarize the text and try to evaluate it"
-FILE_PATH = ".data/sample-essay-1.pdf"
+
+FILE_PATH = ".data/dataset.txt"
 AGENT_ROLE = (
     "A helpful and general-purpose AI assistant with strong language, Python, "
     "and Linux command-line skills. The goal is to provide concise answers to the user. "
@@ -21,13 +22,14 @@ AGENT_ROLE = (
     "You can install any packages for loading PDFS, such as PyMuPDF, PyPDF2, or pdfplumber."
     "and for the other file extensions as well, if you need to open them try to search and then install."
     "Also if you are working with binary files, try to understand the file format and then read the file."
+    "You write well-written Python code, and analyze you code for errors before running it."
 )
 
 
 def run_workflow(
     agent: ReActAgent,
     input_prompt: str,
-    input_files: list,
+    input_files: list = None,
 ) -> tuple[str, dict]:
     """
     Execute a workflow using the ReAct agent to process a predefined query.
@@ -42,8 +44,12 @@ def run_workflow(
     wf = Workflow(flow=Flow(nodes=[agent]))
 
     try:
+        if input_files:
+            input_data = {"input": input_prompt, "files": input_files}
+        else:
+            input_data = {"input": input_prompt}
         result = wf.run(
-            input_data={"input": input_prompt, "files": input_files},
+            input_data=input_data,
             config=RunnableConfig(callbacks=[tracing]),
         )
         # Verify that traces can be serialized to JSON
@@ -62,7 +68,12 @@ csv_bytes = open(FILE_PATH, "rb").read()
 
 python_tool = E2BInterpreterTool(connection=E2B())
 
-llm = setup_llm()
+llm = setup_llm(
+    model_provider="togetherai",
+    model_name="meta-llama/Llama-3.2-90B-Vision-Instruct-Turbo",
+    temperature=0.1,
+    max_tokens=4000,
+)
 
 
 agent = ReActAgent(

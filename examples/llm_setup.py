@@ -3,17 +3,20 @@ from dynamiq.connections import Cohere as CohereConnection
 from dynamiq.connections import Gemini as GeminiConnection
 from dynamiq.connections import Groq as GroqConnection
 from dynamiq.connections import OpenAI as OpenAIConnection
+from dynamiq.connections import TogetherAI as TogetherAIConnection
 from dynamiq.nodes.llms.anthropic import Anthropic
 from dynamiq.nodes.llms.cohere import Cohere
 from dynamiq.nodes.llms.gemini import Gemini
 from dynamiq.nodes.llms.groq import Groq
 from dynamiq.nodes.llms.openai import OpenAI
+from dynamiq.nodes.llms.togetherai import TogetherAI
 
 MODEL_NAME_GPT = "gpt-4o-mini"
 MODEL_NAME_CLAUDE = "claude-3-5-sonnet-20240620"
 MODEL_NAME_COHERE = "command-r-plus"
 MODEL_NAME_GROQ = "groq/llama3-70b-8192"
 MODEL_NAME_GEMINI = "gemini/gemini-1.5-pro-latest"
+MODEL_NAME_TOGETHERAI = "meta-llama/Llama-3.2-90B-Vision-Instruct-Turbo"
 MODEL_PROVIDER = "gpt"
 MODEL_NAME = MODEL_NAME_GPT
 TEMPERATURE = 0.1
@@ -74,6 +77,14 @@ def setup_llm(
         return Gemini(
             name="Gemini LLM",
             connection=GeminiConnection(),
+            model=model_name,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+    elif model_provider == "togetherai":
+        return TogetherAI(
+            name="TogetherAI LLM",
+            connection=TogetherAIConnection(),
             model=model_name,
             temperature=temperature,
             max_tokens=max_tokens,
