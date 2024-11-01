@@ -2,14 +2,15 @@ import re
 
 from dynamiq import Workflow
 from dynamiq.callbacks import TracingCallbackHandler
+from dynamiq.connections import OpenAI as OpenAIConnection
 from dynamiq.connections import ScaleSerp
 from dynamiq.flows import Flow
 from dynamiq.nodes import InputTransformer
 from dynamiq.nodes.agents.simple import SimpleAgent
+from dynamiq.nodes.llms.openai import OpenAI
 from dynamiq.nodes.tools.scale_serp import ScaleSerpTool
 from dynamiq.runnables import RunnableConfig
 from dynamiq.utils.logger import logger
-from examples.llm_setup import setup_llm
 
 
 def extract_tag_content(text, tag):
@@ -77,10 +78,22 @@ Remember to focus on accuracy, clarity, and proper citation in your response.
 If there are errors with the query or you are unable to craft a response, provide polite feedback within the <answer> tags.
 Explain that you are not able to find the answer and provide some suggestions for the user to improve the query.
 """  # noqa E501
-
 # Setup models
-llm_mini = setup_llm(model_provider="gpt", model_name="gpt-4o-mini", max_tokens=500, temperature=0.5)
-llm = setup_llm(model_provider="gpt", model_name="gpt-4o", max_tokens=3000, temperature=0.1)
+llm_mini = OpenAI(
+    name="OpenAI LLM Mini",
+    connection=OpenAIConnection(),
+    model="gpt-4o-mini",
+    temperature=0.1,
+    max_tokens=3000,
+)
+llm = OpenAI(
+    name="OpenAI LLM",
+    connection=OpenAIConnection(),
+    model="gpt-4o",
+    temperature=0.1,
+    max_tokens=4000,
+)
+
 # Define agents and search tool
 agent_query_rephraser = SimpleAgent(
     id="agent_query_rephraser",

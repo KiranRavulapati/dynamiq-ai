@@ -50,7 +50,6 @@ def process_query(query: str):
         str: Chunks of the final answer and sources.
     """
     try:
-        # Step 1: Rephrase the query
         payload = {"input": {"input": query}}
         response = requests.post(ENDPOINT, json=payload, headers=headers)  # nosec B113
         response.raise_for_status()
