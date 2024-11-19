@@ -619,6 +619,38 @@ class ReActAgent(Agent):
         else:
             return getattr(param_type, "__name__", "string")
 
+    def generate_structured_output_schemas(self):
+        tool_names = [self.sanitize_tool_name(tool.name) for tool in self.tools]
+
+        schema = {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "plan_next_action",
+                "strict": True,
+                "schema": {
+                    "type": "object",
+                    "required": ["thought", "action", "action_input"],
+                    "properties": {
+                        "thought": {
+                            "type": "string",
+                            "description": "Your reasoning about the next step.",
+                        },
+                        "action": {
+                            "type": "string",
+                            "description": f"Next action to make (choose from [{tool_names}, finish]).",
+                        },
+                        "action_input": {
+                            "type": "string",
+                            "description": "Input for chosen action.",
+                        },
+                    },
+                    "additionalProperties": False,
+                },
+            },
+        }
+
+        self.format_schema = schema
+
     def _init_prompt_blocks(self):
         """Initialize the prompt blocks required for the ReAct strategy."""
         super()._init_prompt_blocks()
