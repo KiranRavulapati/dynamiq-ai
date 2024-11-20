@@ -8,14 +8,9 @@ from dynamiq.nodes.tools.human_feedback import HumanFeedbackTool
 from dynamiq.runnables import RunnableResult
 from examples.llm_setup import setup_llm
 
-try:
-    from yaml import CLoader as Loader
-except ImportError:
-    from yaml import Loader
-
 from examples.kiroku_multiagent.states import internet_search_state, suggest_title_review_state, suggest_title_state
 
-nodes = {"internet_search": internet_search_state}
+STATES = {"internet_search": internet_search_state}
 
 
 def is_title_review_complete(context: dict[str, Any]):
@@ -40,6 +35,9 @@ def create_orchestrator(configuration) -> GraphOrchestrator:
         initial_state="suggest_title" if suggest_title else "internet_search",
     )
 
+    for name, state in STATES.items():
+        orchestrator.add_node(name, [state])
+
     if suggest_title:
         orchestrator.add_node("suggest_title", [suggest_title_state])
         orchestrator.add_node("suggest_title_review", [suggest_title_review_state])
@@ -56,7 +54,7 @@ def create_orchestrator(configuration) -> GraphOrchestrator:
 
 def parse_configuration(filename):
     stream = open(filename)
-    state = yaml.safe_load(stream, Loader=Loader)
+    state = yaml.safe_load(stream)
     return state
 
 

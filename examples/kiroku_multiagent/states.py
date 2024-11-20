@@ -28,14 +28,20 @@ def inference_model(messages):
 
 def suggest_title_review_state(context: dict[str, Any]):
     """State that suggests user to review proposed titles"""
-    if instruction := context["update_instruction"]:
+
+    messages = [Message(**message) for message in context.get("messages", [])]
+
+    instruction = context.get("update_instruction")
+    if instruction:
         message = Message(role="user", content=instruction)
     else:
-        messages = []
         message = Message(role="user", content="Just return the final title without any additional information")
 
-    messages = context["messages"].append(message)
+    messages = messages.append(message)
     llm_result = inference_model(messages)
+
+    if not instruction:
+        messages = []
 
     return {"result": llm_result, "messages": messages}
 
