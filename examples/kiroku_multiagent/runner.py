@@ -6,15 +6,49 @@ from dynamiq.nodes.agents.orchestrators.graph import END, GraphOrchestrator
 from dynamiq.nodes.agents.orchestrators.graph_manager import GraphAgentManager
 from dynamiq.nodes.tools.human_feedback import HumanFeedbackTool
 from dynamiq.runnables import RunnableResult
+from examples.kiroku_multiagent.states import (
+    additional_reflection_review,
+    generate_caption,
+    generate_citation,
+    generate_references,
+    internet_search_state,
+    reflection_review,
+    review_topic_sentence,
+    suggest_title_review_state,
+    suggest_title_state,
+    write_abstract,
+    write_paper,
+    write_paper_review,
+    write_topic,
+)
 from examples.llm_setup import setup_llm
 
-from examples.kiroku_multiagent.states import internet_search_state, suggest_title_review_state, suggest_title_state
-
-STATES = {"internet_search": internet_search_state}
+STATES = {
+    "internet_search": internet_search_state,
+    "write_topic": write_topic,
+    "review_topic_sentence": review_topic_sentence,
+    "write_paper": write_paper,
+    "write_paper_review": write_paper_review,
+    "reflection_review": reflection_review,
+    "additional_reflection_review": additional_reflection_review,
+    "write_abstract": write_abstract,
+    "generate_references": generate_references,
+    "generate_caption": generate_caption,
+    "generate_citation": generate_citation,
+}
 
 
 def is_title_review_complete(context: dict[str, Any]):
-    return True if context.get("messages") else False
+    return "suggest_title" if context.get("messages") else "internet_search"
+
+
+def is_paper_review_complete(context: dict[str, Any]):
+    if context.get("update_instruction"):
+        return "write_paper_review"
+    elif context.get("revision_number") <= context.get("max_revisions"):
+        return "reflection_review"
+    else:
+        return "write_abstract"
 
 
 def create_orchestrator(configuration) -> GraphOrchestrator:
@@ -42,12 +76,28 @@ def create_orchestrator(configuration) -> GraphOrchestrator:
         orchestrator.add_node("suggest_title", [suggest_title_state])
         orchestrator.add_node("suggest_title_review", [suggest_title_review_state])
 
-        orchestrator.add_edge("suggest_title", "suggest_title_review")
-        orchestrator.add_conditional_edge(
-            "suggest_title_review", ["suggest_title", "internet_search"], is_title_review_complete
-        )
+    orchestrator.add_edge("suggest_title", "suggest_title_review")
+    orchestrator.add_conditional_edge(
+        "suggest_title_review", ["suggest_title", "internet_search"], is_title_review_complete
+    )
 
-    orchestrator.add_edge("internet_search", END)
+    orchestrator.add_edge("internet_search", "write_topic")
+    orchestrator.add_edge("write_topic", "review_topic_sentence")
+    orchestrator.add_edge("review_topic_sentence", "write_paper")
+    orchestrator.add_edge("write_paper", "write_paper_review")
+
+    orchestrator.add_conditional_edge(
+        "write_paper_review", ["write_paper_review", "reflection_review", "write_abstract"], is_paper_review_complete
+    )
+
+    orchestrator.add_edge("reflection_review", "additional_reflection_review")
+    orchestrator.add_edge("additional_reflection_review", "write_paper_review")
+
+    orchestrator.add_edge("write_abstract", "generate_references")
+    orchestrator.add_edge("generate_references", "generate_citation")
+    orchestrator.add_edge("generate_citation", "generate_caption")
+
+    orchestrator.add_edge("generate_caption", END)
 
     return orchestrator
 

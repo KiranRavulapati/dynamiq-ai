@@ -5,7 +5,18 @@ from typing import Any
 from dynamiq.connections import ZenRows
 from dynamiq.nodes.tools.zenrows import ZenRowsTool
 from dynamiq.prompts import Message, Prompt
-from examples.kiroku_multiagent.prompts import INTERNET_SEARCH_PROMPT, TASK_TEMPLATE, TITLE_PROMPT
+from examples.kiroku_multiagent.prompts import (
+    ABSTRACT_WRITER_PROMPT,
+    INTERNET_SEARCH_PROMPT,
+    PAPER_WRITER_PROMPT,
+    REFERENCES_PROMPT,
+    REFLECTION_REVIEWER_PROMPT,
+    TASK_TEMPLATE,
+    TITLE_PROMPT,
+    TOPIC_SENTENCE_PROMPT,
+    TOPIC_SENTENCE_REVIEW_PROMPT,
+    WRITER_REVIEW_PROMPT,
+)
 from examples.llm_setup import setup_llm
 
 llm = setup_llm()
@@ -29,7 +40,7 @@ def inference_model(messages):
 def suggest_title_review_state(context: dict[str, Any]):
     """State that suggests user to review proposed titles"""
 
-    messages = [Message(**message) for message in context.get("messages", [])]
+    messages = context.get("messages", [])
 
     instruction = context.get("update_instruction")
     if instruction:
@@ -37,7 +48,7 @@ def suggest_title_review_state(context: dict[str, Any]):
     else:
         message = Message(role="user", content="Just return the final title without any additional information")
 
-    messages = messages.append(message)
+    messages.append(message)
     llm_result = inference_model(messages)
 
     if not instruction:
@@ -49,8 +60,7 @@ def suggest_title_review_state(context: dict[str, Any]):
 def suggest_title_state(context: dict[str, Any]):
     """State that suggests title for a paper."""
 
-    messages = context.get("messages", [])
-
+    messages = [Message(**message) for message in context.get("messages", [])]
     if not messages:
         messages = [
             Message(
@@ -90,7 +100,7 @@ def internet_search_state(context: dict[str, Any]):
                 type_of_document=context.get("type_of_document", "(No type_of_document)"),
                 area_of_paper=context.get("area_of_paper", "(No area_of_paper)"),
                 sections=context.get("sections", "(No sections)"),
-                instruction=context.get("instruction", "(No instruction)"),
+                instruction=context.get("update_instruction", "(No instruction)"),
                 hypothesis=context.get("hypothesis", "(No hypothesis)"),
                 results=context.get("results", "(No results)"),
                 references="\n".join(context.get("references", ["(No references)"])),
@@ -119,4 +129,243 @@ def internet_search_state(context: dict[str, Any]):
     return {
         "result": "Gathered information.",
         "content": content,
+    }
+
+
+def write_topic(context: dict[str, Any]):
+    messages = context.get("messages", [])
+    content = "\n".join(context.get("content"))
+    task = context.get("task")
+
+    if not messages:
+        messages = [Message(role="system", content=TOPIC_SENTENCE_PROMPT)]
+
+    messages.append(
+        Message(
+            role="user",
+            content=(f"This is the content of a search on the internet for the paper:\n\n" f"{content}\n\n" f"{task}"),
+        )
+    )
+
+    result = inference_model(messages)
+
+    messages.append(Message(role="system", content=result))
+
+    return {"result": f"Topic proposed{result}", "plan": result, "draft": result, "messages": messages}
+
+
+def review_topic_sentence(context: dict[str, Any]):
+
+    review_topic_sentences = context.get("review_topic_sentences", [])
+    messages = context.get("messages")
+    instruction = context.get("update_instruction")
+    plan = context.get("plan")
+    task = context.get("task")
+    if instruction:
+        review_topic_sentences.append(instruction)
+        messages.append(
+            Message(
+                role="system",
+                content=(
+                    TOPIC_SENTENCE_REVIEW_PROMPT + "\n\n"
+                    f"Here is my task:\n\n{task}\n\n"
+                    f"Here is my plan:\n\n{plan}\n\n"
+                    f"Here is my instruction:\n\n{instruction}\n\n"
+                    "Only return the Markdown for the new plan as output. "
+                ),
+            )
+        )
+
+        result = inference_model(messages)
+
+        messages.append(Message(role="system", content=result))
+
+    return {
+        "result": f"Topic after review {result}",
+        "plan": result,
+        "draft": result,
+        "messages": messages,
+        "review_topic_sentences": review_topic_sentences,
+    }
+
+
+def write_paper(context: dict[str, Any]):
+    content = "\n\n".join(context.get("content", []))
+    critique = context.get("critique", "")
+    review_instructions = context.get("review_instructions", [])
+    task = context.get("task")
+    sentences_per_paragraph = context.get("sentences_per_paragraph")
+    state = context.get("state")
+    if state == "internet_search":
+        additional_info = " in terms of topic sentences"
+    else:
+        additional_info = ""
+
+    messages = [
+        Message(
+            role="system",
+            content=PAPER_WRITER_PROMPT.format(
+                task=task,
+                content=content,
+                review_instructions=review_instructions,
+                critique=critique,
+                sentences_per_paragraph=sentences_per_paragraph,
+            ),
+        ),
+        Message(
+            role="user",
+            content=(
+                "Generate a new draft of the document based on the "
+                "information I gave you.\n\n"
+                f"Here is my current draft{additional_info}:\n\n"
+                f"{state['draft']}\n\n"
+            ),
+        ),
+    ]
+
+    result = inference_model(messages)
+
+    return {
+        "result": "Paper rewritten successfully",
+        "state": "write_paper",
+        "draft": result,
+        "revision_number": context.get("revision_number", 1) + 1,
+    }
+
+
+def write_paper_review(context: dict[str, Any]):
+    review_instructions = context.get("review_instructions", [])
+    instruction = context.get("update_instruction")
+    draft = context.get("draft")
+    task = context.get("task")
+
+    if instruction:
+        review_instructions.append(instruction)
+        joined_instructions = "\n".join(review_instructions)
+        messages = [
+            Message(role="system", content=WRITER_REVIEW_PROMPT),
+            Message(
+                role="user",
+                content=(
+                    "Here is my task:\n\n"
+                    f"{task}"
+                    "\n\n"
+                    "Here is my draft:\n\n"
+                    f"{draft}"
+                    "\n\n"
+                    "Here is my instruction:\n\n"
+                    f"{instruction}"
+                    "\n\n"
+                    "Here is my previous instructions that you must "
+                    "observe:\n\n"
+                    f"{joined_instructions}"
+                    "\n\n"
+                    "Only change in the draft what the user has requested by "
+                    "the instruction.\n"
+                    "Only return the Markdown for the new plan as output. "
+                ),
+            ),
+        ]
+
+        result = inference_model(messages)
+
+    return {
+        "result": "Paper review finished",
+        "state": "paper review",
+        "review_instructions": review_instructions,
+        "draft": result,
+    }
+
+
+def reflection_review(context: dict[str, Any]):
+    review_instructions = context.get("review_instructions")
+    messages = [
+        Message(
+            role="system",
+            content=REFLECTION_REVIEWER_PROMPT.format(
+                hypothesis=context.get("hypothesis"), review_instructions=review_instructions
+            ),
+        ),
+        Message(role="user", content=context.get("draft")),
+    ]
+    result = inference_model(messages)
+    return {"result": f"Reflection finished with critique {result}", "state": "reflection_review", "critique": result}
+
+
+def additional_reflection_review(context: dict[str, Any]):
+    additional_critique = context.get("update_instruction")
+    critique = context.get("critique")
+    if additional_critique:
+        critique = critique + "\n\nAdditional User's feedback:\n" f"{additional_critique}\n"
+    return {"state": "additional_reflection_review", "critique": critique}
+
+
+def write_abstract(context: dict[str, Any]):
+    task = context.get("task")
+    plan = context.get("plan")
+    content = context.get("content")
+    draft = context.get("draft")
+    messages = [
+        Message(role="system", content=ABSTRACT_WRITER_PROMPT),
+        Message(
+            role="user",
+            content=(
+                f"Here is my task:\n\n{task}\n\n"
+                f"Here is my plan:\n\n{plan}\n\n"
+                f"Here is my research content:\n\n{content}"
+                f"Here is my current draft:\n\n{draft}\n\n"
+            ),
+        ),
+    ]
+
+    result = inference_model(messages)
+    return {"result": f"Generated abstract of the paper {result}", "state": "write_abstract", "draft": result}
+
+
+def generate_references(context: dict[str, Any]):
+    content = "\n".join(context.get("content"))
+    messages = [
+        Message(role="system", content=REFERENCES_PROMPT),
+        Message(
+            role="user",
+            content=("Generate references for the following content entries. " "\n\n" "Content:" "\n\n" f"{content}"),
+        ),
+    ]
+
+    result = inference_model(messages)
+
+    return {
+        "result": f"Generated references for the paper {result}",
+        "state": generate_references,
+        "references": result,
+    }
+
+
+def generate_citation(context: dict[str, Any]):
+    references = context.get("references")
+    draft = context.get("draft")
+    draft = draft + "\n\n" + references
+    return {
+        "state": "generate_citation",
+        "draft": draft,
+    }
+
+
+def generate_caption(context: dict[str, Any]):
+    draft = context.get("draft")
+    pattern = r"!\[([^\]]*)\]\(([^\)]*)\)"
+
+    result = list(reversed(list(re.finditer(pattern, draft))))
+    fig = len(result)
+
+    for entry in result:
+        left, right = entry.span()
+        caption = f'![]({entry[2]})\n\n<div align="center">Figure {fig}:' f"{entry[1]}</div>\n"
+        draft = draft[:left] + caption + draft[right:]
+        fig -= 1
+
+    return {
+        "result": "Generated captions",
+        "state": "generate_caption",
+        "draft": draft,
     }
